@@ -764,6 +764,42 @@ def api_health():
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
 
 
+@app.route("/api/seed-questions", methods=["POST"])
+def api_seed_questions():
+    """Seed questions into the DB for a specific site. Protected by CRON_SECRET."""
+    secret = request.headers.get("X-Cron-Secret") or request.args.get("secret")
+    expected = os.getenv("CRON_SECRET", "")
+    if expected and secret != expected:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(force=True)
+    site_id = data.get("site_id", "")
+    questions = data.get("questions", [])
+
+    if not site_id or not questions:
+        return jsonify({"error": "site_id and questions required"}), 400
+
+    from modules import db
+    count = 0
+    for q in questions:
+        question = q if isinstance(q, str) else q.get("question", "")
+        topic = q.get("topic", "") if isinstance(q, dict) else ""
+        keywords = q.get("keywords", "") if isinstance(q, dict) else ""
+        context = q.get("context", "Seeded from PAA research") if isinstance(q, dict) else "Seeded from PAA research"
+        if question:
+            db.save_question(
+                call_id=f"seed_{site_id}_{count}",
+                question=question,
+                topic=topic,
+                keywords=keywords,
+                context=context,
+                site_id=site_id,
+            )
+            count += 1
+
+    return jsonify({"success": True, "seeded": count, "site_id": site_id})
+
+
 @app.route("/api/debug/test-subprocess")
 def api_debug_test():
     """Quick test: run a trivial subprocess to verify threading works."""
