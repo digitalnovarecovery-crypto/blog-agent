@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-import base64
+import io
 import os
+import tempfile
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import anthropic
 from ringcentral import SDK
 
 import config
 
-# Max audio file size for Claude transcription (25MB)
+# Max audio file size for Whisper transcription (25MB)
 MAX_AUDIO_BYTES = 25 * 1024 * 1024
+
+# Whisper model — "tiny" is fastest, "base" is better quality, "small" best balance
+WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
 
 # Min call duration to bother transcribing (skip very short calls)
 MIN_CALL_DURATION_SECS = 60
@@ -25,16 +28,25 @@ class RingCentralClient:
     def __init__(self):
         self.sdk = SDK(config.RC_CLIENT_ID, config.RC_CLIENT_SECRET, config.RC_SERVER)
         self.platform = self.sdk.platform()
-        self._claude = None
+        self._whisper_model = None
+
+    def _get_whisper(self):
+        """Lazy-load the faster-whisper model."""
+        if self._whisper_model is None:
+            from faster_whisper import WhisperModel
+            print(f"  Loading Whisper model '{WHISPER_MODEL_SIZE}' (first call only)...")
+            self._whisper_model = WhisperModel(
+                WHISPER_MODEL_SIZE,
+                device="cpu",
+                compute_type="int8",
+            )
+            print(f"  Whisper model loaded.")
+        return self._whisper_model
 
     def login(self):
         self.platform.login(jwt=config.RC_JWT_TOKEN)
         print("Logged into RingCentral.")
 
-    def _get_claude(self) -> anthropic.Anthropic:
-        if self._claude is None:
-            self._claude = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-        return self._claude
 
     def _api_get(self, url_or_path, params=None, max_retries=3):
         """GET with automatic retry on 429 rate limit."""
@@ -142,11 +154,10 @@ class RingCentralClient:
         return None
 
     def get_transcript(self, call_record: dict) -> str | None:
-        """Transcribe a call recording using Claude's audio input capability.
+        """Transcribe a call recording using local faster-whisper model.
 
-        Downloads the recording from RingCentral and sends it to Claude
-        for transcription. Much faster and more reliable than RC's async
-        AI speech-to-text API (which requires special permissions).
+        Downloads the recording from RingCentral and transcribes locally.
+        No external API needed — runs on CPU with int8 quantization.
         """
         call_id = call_record.get("id", "")
 
@@ -156,54 +167,41 @@ class RingCentralClient:
 
         audio_data, content_type = result
 
-        # Map RC content types to Claude-supported media types
-        media_type_map = {
-            "audio/mpeg": "audio/mpeg",
-            "audio/mp3": "audio/mpeg",
-            "audio/wav": "audio/wav",
-            "audio/x-wav": "audio/wav",
-            "audio/ogg": "audio/ogg",
-            "audio/webm": "audio/webm",
+        # Determine file extension
+        ext_map = {
+            "audio/mpeg": "mp3",
+            "audio/mp3": "mp3",
+            "audio/wav": "wav",
+            "audio/x-wav": "wav",
+            "audio/ogg": "ogg",
+            "audio/webm": "webm",
         }
-        media_type = media_type_map.get(content_type, "audio/mpeg")
-
-        audio_b64 = base64.standard_b64encode(audio_data).decode("utf-8")
+        ext = ext_map.get(content_type, "mp3")
 
         try:
-            client = self._get_claude()
-            response = client.messages.create(
-                model=config.CLAUDE_MODEL,
-                max_tokens=8000,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "audio",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": audio_b64,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "Transcribe this phone call recording verbatim. "
-                                "Label speakers as 'Staff:' and 'Caller:' based on context "
-                                "(the staff member works at a recovery/treatment center). "
-                                "Output ONLY the transcript text, no commentary."
-                            ),
-                        },
-                    ],
-                }],
-            )
-            transcript = response.content[0].text.strip()
+            model = self._get_whisper()
+
+            # Write audio to temp file (faster-whisper needs a file path)
+            with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
+                tmp.write(audio_data)
+                tmp_path = tmp.name
+
+            try:
+                segments, info = model.transcribe(
+                    tmp_path,
+                    language="en",
+                    initial_prompt="Phone call to a drug and alcohol recovery treatment center. Staff and callers discussing rehab, detox, sober living, insurance, and admissions.",
+                    vad_filter=True,  # Skip silence for speed
+                )
+                transcript = " ".join(seg.text.strip() for seg in segments)
+            finally:
+                os.unlink(tmp_path)
 
             if len(transcript) < 50:
                 print(f"  SKIP call {call_id}: transcript too short ({len(transcript)} chars)")
                 return None
 
-            print(f"  Transcribed call {call_id}: {len(transcript)} chars")
+            print(f"  Transcribed call {call_id}: {len(transcript)} chars ({info.duration:.0f}s audio)")
             return transcript
 
         except Exception as e:
