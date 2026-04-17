@@ -1,2 +1,4 @@
+# Add ffmpeg for faster-whisper audio decoding
+# Using aptPkgs to avoid overriding nixpacks' auto-detected Python
 [phases.setup]
-nixPkgs = ["ffmpeg"]
+aptPkgs = ["ffmpeg"]
