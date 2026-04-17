@@ -756,6 +756,58 @@ def api_health():
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
 
 
+# -- Scheduled daily pipeline run (6 AM CT / 11:00 UTC) ----------------------
+def _scheduled_pipeline_run():
+    """Called by APScheduler at 6 AM CT daily."""
+    import logging
+    logging.getLogger("apscheduler").info("Scheduled pipeline run starting...")
+    if _pipeline_status["running"]:
+        logging.getLogger("apscheduler").warning("Pipeline already running, skipping scheduled run")
+        return
+    _pipeline_status["running"] = True
+    _pipeline_status["last_run"] = datetime.now().isoformat()
+    try:
+        result = subprocess.run(
+            [sys.executable, "pipeline_runner.py"],
+            capture_output=True, text=True, timeout=900,
+            cwd=str(Path(__file__).resolve().parent),
+        )
+        _pipeline_status["last_result"] = {
+            "exit_code": result.returncode,
+            "stdout_tail": result.stdout[-2000:] if result.stdout else "",
+            "stderr_tail": result.stderr[-1000:] if result.stderr else "",
+            "finished": datetime.now().isoformat(),
+            "trigger": "scheduled",
+        }
+    except Exception as e:
+        _pipeline_status["last_result"] = {
+            "exit_code": -1,
+            "error": str(e),
+            "finished": datetime.now().isoformat(),
+            "trigger": "scheduled",
+        }
+    finally:
+        _pipeline_status["running"] = False
+
+
+# Only start scheduler in production (gunicorn), not in dev reload
+if os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PUBLIC_DOMAIN"):
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        scheduler = BackgroundScheduler(daemon=True)
+        scheduler.add_job(
+            _scheduled_pipeline_run,
+            "cron",
+            hour=11, minute=0,  # 11:00 UTC = 6:00 AM CT
+            id="daily_pipeline",
+            replace_existing=True,
+        )
+        scheduler.start()
+        print("APScheduler started: daily pipeline at 11:00 UTC (6 AM CT)")
+    except ImportError:
+        print("WARNING: APScheduler not installed, daily runs disabled")
+
+
 # -- Main ---------------------------------------------------------------------
 if __name__ == "__main__":
     print("Multi-Site Blog Agent Dashboard")
