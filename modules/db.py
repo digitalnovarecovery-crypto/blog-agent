@@ -79,6 +79,14 @@ def is_call_processed(call_id: str) -> bool:
     return row is not None
 
 
+def get_all_processed_call_ids() -> set[str]:
+    """Return all processed call IDs as a set for fast lookup."""
+    conn = get_connection()
+    rows = conn.execute("SELECT call_id FROM processed_calls").fetchall()
+    conn.close()
+    return {r[0] for r in rows}
+
+
 def mark_call_processed(call_id: str, transcript_length: int, site_id: str = ""):
     conn = get_connection()
     conn.execute(

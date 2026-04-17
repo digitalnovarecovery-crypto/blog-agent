@@ -789,13 +789,20 @@ def run_pipeline(site_filter: str | None = None, max_posts: int | None = None,
         try:
             rc = RingCentralClient()
             rc.login()
-            calls = rc.get_calls_with_transcripts(days=RC_CALL_LOG_DAYS)
-            print(f"  Got {len(calls)} calls with transcripts.")
+
+            # Pre-filter: get already-processed call IDs so we skip them
+            # BEFORE downloading recordings (avoids RC rate limits)
+            processed_ids = db.get_all_processed_call_ids()
+            print(f"  Already processed: {len(processed_ids)} calls in DB")
+
+            calls = rc.get_calls_with_transcripts(
+                days=RC_CALL_LOG_DAYS,
+                skip_call_ids=processed_ids,
+            )
+            print(f"  Got {len(calls)} NEW calls with transcripts.")
 
             for call in calls:
                 call_id = call["call_id"]
-                if db.is_call_processed(call_id):
-                    continue
 
                 # Route to site by destination phone number (which site was called)
                 to_number = call.get("to_number", "")
