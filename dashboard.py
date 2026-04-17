@@ -715,14 +715,19 @@ def api_cron_run():
     _pipeline_status["running"] = True
     _pipeline_status["last_run"] = datetime.now().isoformat()
 
+    skip_calls = request.args.get("skip_calls") == "1" or (request.json or {}).get("skip_calls", False)
+
     def _run():
         import traceback
+        cmd = [sys.executable, "pipeline_runner.py"]
+        if skip_calls:
+            cmd.append("--skip-calls")
         try:
             result = subprocess.run(
-                [sys.executable, "pipeline_runner.py"],
-                capture_output=True, text=True, timeout=900,
+                cmd,
+                capture_output=True, text=True, timeout=1800,  # 30 min timeout
                 cwd=str(Path(__file__).resolve().parent),
-                env={**os.environ},  # inherit all env vars
+                env={**os.environ},
             )
             _pipeline_status["last_result"] = {
                 "exit_code": result.returncode,

@@ -210,7 +210,7 @@ class RingCentralClient:
 
     def get_calls_with_transcripts(self, days: int | None = None,
                                      skip_call_ids: set[str] | None = None,
-                                     max_transcriptions: int = 20) -> list[dict]:
+                                     max_transcriptions: int = 5) -> list[dict]:
         """Fetch calls and transcribe them via Claude.
 
         Returns list of {call_id, timestamp, transcript, caller_info, to_number}.
