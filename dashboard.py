@@ -711,9 +711,11 @@ def api_cron_run():
     if _pipeline_status["running"]:
         return jsonify({"error": "Pipeline already running"}), 409
 
+    # Set running=True BEFORE spawning thread to avoid race conditions
+    _pipeline_status["running"] = True
+    _pipeline_status["last_run"] = datetime.now().isoformat()
+
     def _run():
-        _pipeline_status["running"] = True
-        _pipeline_status["last_run"] = datetime.now().isoformat()
         try:
             result = subprocess.run(
                 [sys.executable, "pipeline_runner.py"],
