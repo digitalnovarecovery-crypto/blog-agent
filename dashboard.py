@@ -716,11 +716,13 @@ def api_cron_run():
     _pipeline_status["last_run"] = datetime.now().isoformat()
 
     def _run():
+        import traceback
         try:
             result = subprocess.run(
                 [sys.executable, "pipeline_runner.py"],
                 capture_output=True, text=True, timeout=900,
                 cwd=str(Path(__file__).resolve().parent),
+                env={**os.environ},  # inherit all env vars
             )
             _pipeline_status["last_result"] = {
                 "exit_code": result.returncode,
@@ -737,14 +739,14 @@ def api_cron_run():
         except Exception as e:
             _pipeline_status["last_result"] = {
                 "exit_code": -1,
-                "error": str(e),
+                "error": f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
                 "finished": datetime.now().isoformat(),
             }
         finally:
             _pipeline_status["running"] = False
 
     with _pipeline_lock:
-        thread = threading.Thread(target=_run, daemon=True)
+        thread = threading.Thread(target=_run)
         thread.start()
 
     return jsonify({"success": True, "message": "Pipeline run started"})
@@ -760,6 +762,25 @@ def api_cron_status():
 def api_health():
     """Health check endpoint for Railway."""
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
+
+
+@app.route("/api/debug/test-subprocess")
+def api_debug_test():
+    """Quick test: run a trivial subprocess to verify threading works."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", "import pipeline_runner; print('Pipeline module OK')"],
+            capture_output=True, text=True, timeout=30,
+            cwd=str(Path(__file__).resolve().parent),
+            env={**os.environ},
+        )
+        return jsonify({
+            "exit_code": result.returncode,
+            "stdout": result.stdout[:500],
+            "stderr": result.stderr[:500],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # -- Scheduled daily pipeline run (6 AM CT / 11:00 UTC) ----------------------
