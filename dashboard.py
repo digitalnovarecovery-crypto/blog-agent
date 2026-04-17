@@ -227,8 +227,12 @@ def require_login():
     """Redirect to login for all pages except auth routes and static files."""
     if not AUTH0_ENABLED:
         return None
-    public_routes = {"login", "callback", "logout", "static"}
+    public_routes = {"login", "callback", "logout", "static",
+                      "api_health", "api_cron_run", "api_cron_status"}
     if request.endpoint in public_routes:
+        return None
+    # Also allow any /api/ path (belt-and-suspenders)
+    if request.path.startswith("/api/"):
         return None
     if "user" not in session:
         return redirect(url_for("login"))
