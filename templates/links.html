@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Internal Links{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-800 mb-6">Internal Linking Map</h2>
+
+<!-- Pillar Pages -->
+{% if pillar_pages %}
+<div class="rounded-xl p-5 mb-6 border" style="background:{{ brand_color }}0a; border-color:{{ brand_color }}33">
+    <h3 class="font-semibold mb-3" style="color:{{ brand_color }}">Pillar Pages (Always Link To)</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+        {% for url in pillar_pages %}
+        <a href="{{ current_site.wp_site_url if current_site else '' }}{{ url }}" target="_blank"
+           class="text-sm flex items-center gap-1 hover:underline" style="color:{{ brand_color }}">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            {{ url }}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Summary Cards -->
+{% if counts %}
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    {% for link_type, count in counts.items() %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <p class="text-xs text-gray-400 uppercase">{{ link_type }}</p>
+        <p class="text-2xl font-bold text-gray-700 mt-1">{{ count }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Links Table -->
+{% for link_type, links in grouped.items() %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+        <h3 class="font-semibold text-gray-700 text-sm uppercase">{{ link_type }} ({{ links | length }})</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="text-gray-400 text-xs">
+                <tr>
+                    <th class="px-5 py-2 text-left">Title</th>
+                    <th class="px-5 py-2 text-left">URL</th>
+                    <th class="px-5 py-2 text-left">Keywords</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+                {% for link in links %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-2 text-gray-700">{{ link.title or '-' }}</td>
+                    <td class="px-5 py-2">
+                        <a href="{{ link.url }}" target="_blank" class="text-blue-500 hover:text-blue-700 text-xs truncate block max-w-[300px]">{{ link.url }}</a>
+                    </td>
+                    <td class="px-5 py-2 text-gray-400 text-xs">{{ link.keywords or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+{% if not grouped %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400">
+    No internal links cached yet for {{ site_name }}. Run the site crawler to populate.
+</div>
+{% endif %}
+{% endblock %}

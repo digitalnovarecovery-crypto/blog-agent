@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Questions{% endblock %}
+{% block content %}
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <h2 class="text-2xl font-bold text-gray-800">Extracted Questions</h2>
+    <div class="flex gap-2">
+        <a href="/questions?status=all" class="px-3 py-1.5 rounded-lg text-sm font-medium {% if status_filter == 'all' %}text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}" {% if status_filter == 'all' %}style="background:{{ brand_color }}"{% endif %}>All</a>
+        <a href="/questions?status=pending" class="px-3 py-1.5 rounded-lg text-sm font-medium {% if status_filter == 'pending' %}bg-amber-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">Pending</a>
+        <a href="/questions?status=used" class="px-3 py-1.5 rounded-lg text-sm font-medium {% if status_filter == 'used' %}bg-green-700 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">Used</a>
+        <a href="/questions?status=archived" class="px-3 py-1.5 rounded-lg text-sm font-medium {% if status_filter == 'archived' %}bg-gray-700 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">Archived</a>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="px-4 py-3 text-left">Question</th>
+                    <th class="px-4 py-3 text-left">Site</th>
+                    <th class="px-4 py-3 text-left">Topic</th>
+                    <th class="px-4 py-3 text-left">Keywords</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Created</th>
+                    <th class="px-4 py-3 text-left">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for q in questions %}
+                <tr class="hover:bg-gray-50" id="q-row-{{ q.id }}">
+                    <td class="px-4 py-3 text-gray-800 max-w-[300px]">{{ q.question }}</td>
+                    <td class="px-4 py-3 text-xs text-gray-400">{{ q.site_id or current_site_id }}</td>
+                    <td class="px-4 py-3 text-gray-500">{{ q.topic or '-' }}</td>
+                    <td class="px-4 py-3 text-gray-400 text-xs max-w-[150px] truncate">{{ q.keywords or '-' }}</td>
+                    <td class="px-4 py-3" id="q-status-{{ q.id }}">
+                        {% if q.status == 'pending' %}
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending</span>
+                        {% elif q.status == 'used' %}
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Used</span>
+                        {% else %}
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ q.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{{ q.created_at | format_dt }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        {% if q.status == 'pending' %}
+                        <button onclick="updateStatus({{ q.id }}, 'used')" class="text-green-600 hover:text-green-800 text-xs font-medium mr-1">Mark Used</button>
+                        <button onclick="updateStatus({{ q.id }}, 'archived')" class="text-gray-400 hover:text-gray-600 text-xs font-medium">Archive</button>
+                        {% elif q.status == 'used' %}
+                        <button onclick="updateStatus({{ q.id }}, 'archived')" class="text-gray-400 hover:text-gray-600 text-xs font-medium">Archive</button>
+                        {% elif q.status == 'archived' %}
+                        <button onclick="updateStatus({{ q.id }}, 'pending')" class="text-amber-500 hover:text-amber-700 text-xs font-medium">Restore</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not questions %}
+                <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No questions found.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+async function updateStatus(qId, newStatus) {
+    const resp = await fetch(`/api/questions/${qId}/status`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: newStatus})
+    });
+    if (resp.ok) {
+        location.reload();
+    } else {
+        alert('Failed to update status');
+    }
+}
+</script>
+{% endblock %}

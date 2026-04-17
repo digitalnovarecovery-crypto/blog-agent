@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Edit Post #{{ post_id }}{% endblock %}
+{% block content %}
+{% set meta = wp.get('meta', {}) %}
+<div class="flex items-center gap-3 mb-6">
+    <a href="/posts" class="text-gray-400 hover:text-gray-600">&larr; Back</a>
+    <h2 class="text-2xl font-bold text-gray-800">Edit Post</h2>
+    <span class="text-sm text-gray-400">WP #{{ post_id }}</span>
+    {% if local and local.post_type == 'update' %}
+    <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Updated Post</span>
+    {% elif local and local.post_type == 'new' %}
+    <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">New Post</span>
+    {% endif %}
+</div>
+
+<form method="POST" class="space-y-6 max-w-3xl">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+        <h3 class="font-semibold text-gray-700 border-b pb-3">Post Details</h3>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <input type="text" name="title" value="{{ wp.get('title', {}).get('raw', '') }}"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+                <input type="text" name="slug" value="{{ wp.get('slug', '') }}"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Scheduled Time</label>
+                <input type="datetime-local" name="scheduled_time" value="{{ wp.get('date', '')[:16] }}"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Author</label>
+            <select name="author_wp_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand">
+                <option value="">-- Select Author --</option>
+                {% for a in authors %}
+                <option value="{{ a.wp_author_id }}" {% if local and local.author_wp_id == a.wp_author_id %}selected{% endif %}>
+                    {{ a.display_name }}{% if a.is_default %} (default){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Excerpt</label>
+            <textarea name="excerpt" rows="3"
+                      class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand">{{ wp.get('excerpt', {}).get('raw', '') }}</textarea>
+        </div>
+    </div>
+
+    <!-- Yoast SEO -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+        <h3 class="font-semibold text-gray-700 border-b pb-3">Yoast SEO</h3>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Focus Keyphrase</label>
+            <input type="text" name="focus_keyphrase" value="{{ meta.get('_yoast_wpseo_focuskw', '') }}"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+                SEO Title
+                <span id="seo-title-count" class="ml-2 text-xs font-normal"></span>
+            </label>
+            <input type="text" name="seo_title" id="seo_title" value="{{ meta.get('_yoast_wpseo_title', '') }}"
+                   oninput="updateCount('seo_title', 'seo-title-count', 30, 60)"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+                Meta Description
+                <span id="meta-desc-count" class="ml-2 text-xs font-normal"></span>
+            </label>
+            <textarea name="meta_description" id="meta_description" rows="3"
+                      oninput="updateCount('meta_description', 'meta-desc-count', 120, 156)"
+                      class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand">{{ meta.get('_yoast_wpseo_metadesc', '') }}</textarea>
+        </div>
+    </div>
+
+    <!-- Internal Links -->
+    {% if internal_links %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="font-semibold text-gray-700 border-b pb-3 mb-4">Internal Links in This Post</h3>
+        <div class="space-y-2">
+            {% for link in internal_links %}
+            <div class="flex items-center gap-3 text-sm">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                <a href="{{ link.target_url }}" target="_blank" class="text-blue-600 hover:underline truncate">{{ link.anchor_text or link.target_url }}</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Source Transcript -->
+    {% if source_transcript %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="font-semibold text-gray-700 border-b pb-3 mb-4">Source Call Transcript</h3>
+        <details>
+            <summary class="cursor-pointer text-sm font-medium" style="color:{{ brand_color }}">Show transcript</summary>
+            <div class="mt-3 bg-gray-50 rounded-lg p-4 text-sm text-gray-600 whitespace-pre-wrap max-h-96 overflow-y-auto">{{ source_transcript }}</div>
+        </details>
+    </div>
+    {% endif %}
+
+    <!-- Read-only info -->
+    <div class="bg-gray-50 rounded-xl border border-gray-200 p-6">
+        <h3 class="font-semibold text-gray-500 text-sm mb-3">Post Info (read-only)</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+                <span class="text-gray-400">WP Post ID</span>
+                <p class="font-mono text-gray-700">{{ post_id }}</p>
+            </div>
+            <div>
+                <span class="text-gray-400">Status</span>
+                <p class="font-medium">{{ wp.get('status', 'unknown') }}</p>
+            </div>
+            <div>
+                <span class="text-gray-400">Site</span>
+                <p class="font-medium">{{ site_name }}</p>
+            </div>
+            <div>
+                <span class="text-gray-400">Preview</span>
+                <a href="{{ wp.get('link', '#') }}" target="_blank" class="hover:underline" style="color:{{ brand_color }}">Open &nearr;</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex gap-3">
+        <button type="submit" class="text-white px-6 py-2.5 rounded-lg font-medium hover:brightness-110 transition" style="background:{{ brand_color }}">
+            Save to WordPress
+        </button>
+        <a href="/posts" class="px-6 py-2.5 rounded-lg font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 transition">Cancel</a>
+    </div>
+</form>
+
+<script>
+function updateCount(inputId, countId, min, max) {
+    const el = document.getElementById(inputId);
+    const count = el.value.length;
+    const span = document.getElementById(countId);
+    const ok = count >= min && count <= max;
+    span.textContent = `${count} / ${min}-${max} chars`;
+    span.className = `ml-2 text-xs font-normal ${ok ? 'text-green-600' : 'text-red-500'}`;
+}
+document.addEventListener('DOMContentLoaded', () => {
+    updateCount('seo_title', 'seo-title-count', 30, 60);
+    updateCount('meta_description', 'meta-desc-count', 120, 156);
+});
+</script>
+{% endblock %}

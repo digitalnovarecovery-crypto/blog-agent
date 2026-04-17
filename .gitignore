@@ -1,0 +1,11 @@
+.env
+db/tracker.db-journal
+__pycache__/
+modules/__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+recordings/
+credentials/
+.claude/
+node_modules/

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Calls{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-800 mb-6">Processed Calls</h2>
+
+<!-- Unassigned calls -->
+{% if unassigned %}
+<div class="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
+    <h3 class="font-semibold text-amber-800 mb-3">Unassigned Calls ({{ unassigned | length }})</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="text-amber-700 text-xs uppercase">
+                <tr>
+                    <th class="px-4 py-2 text-left">Call ID</th>
+                    <th class="px-4 py-2 text-left">Processed At</th>
+                    <th class="px-4 py-2 text-left">Assign To Site</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-amber-100">
+                {% for call in unassigned %}
+                <tr id="unassigned-{{ call.call_id }}">
+                    <td class="px-4 py-2 font-mono text-gray-700 text-xs">{{ call.call_id }}</td>
+                    <td class="px-4 py-2 text-gray-500">{{ call.processed_at | format_dt }}</td>
+                    <td class="px-4 py-2">
+                        <select onchange="assignCall('{{ call.call_id }}', this.value)" class="text-sm border border-amber-300 rounded-lg px-2 py-1 bg-white">
+                            <option value="">-- Assign --</option>
+                            {% for s in all_sites %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Site-scoped calls -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+        <h3 class="font-semibold text-gray-800">{{ site_name }} Calls</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="px-5 py-3 text-left">Call ID</th>
+                    <th class="px-5 py-3 text-left">Processed At</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for call in calls %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-3 font-mono text-gray-700 text-xs">{{ call.call_id }}</td>
+                    <td class="px-5 py-3 text-gray-500">{{ call.processed_at | format_dt }}</td>
+                </tr>
+                {% endfor %}
+                {% if not calls %}
+                <tr><td colspan="2" class="px-5 py-8 text-center text-gray-400">No calls processed yet for this site.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+async function assignCall(callId, siteId) {
+    if (!siteId) return;
+    const resp = await fetch(`/api/calls/${callId}/assign`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({site_id: siteId})
+    });
+    if (resp.ok) {
+        const data = await resp.json();
+        const row = document.getElementById(`unassigned-${callId}`);
+        if (row) {
+            row.style.transition = 'opacity 0.3s';
+            row.style.opacity = '0';
+            setTimeout(() => row.remove(), 300);
+        }
+    } else {
+        alert('Failed to assign call');
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Posts{% endblock %}
+{% block content %}
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <h2 class="text-2xl font-bold text-gray-800">Posts</h2>
+    <div class="flex gap-2">
+        <a href="/posts?status=all" class="px-3 py-1.5 rounded-lg text-sm font-medium {% if status_filter == 'all' %}text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}" {% if status_filter == 'all' %}style="background:{{ brand_color }}"{% endif %}>All</a>
+        <a href="/posts?status=future" class="px-3 py-1.5 rounded-lg text-sm font-medium {% if status_filter == 'future' %}bg-amber-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">Scheduled</a>
+        <a href="/posts?status=publish" class="px-3 py-1.5 rounded-lg text-sm font-medium {% if status_filter == 'publish' %}bg-green-700 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">Published</a>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="px-4 py-3 text-left">Title</th>
+                    <th class="px-4 py-3 text-left">Type</th>
+                    <th class="px-4 py-3 text-left">Author</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Scheduled</th>
+                    <th class="px-4 py-3 text-left">SEO Title</th>
+                    <th class="px-4 py-3 text-left">Meta Desc</th>
+                    <th class="px-4 py-3 text-left">Keyphrase</th>
+                    <th class="px-4 py-3 text-left">Source</th>
+                    <th class="px-4 py-3 text-left">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for post in posts %}
+                {% set wp = wp_data.get(post.wp_post_id, {}) %}
+                {% set wp_status = wp.get('status', 'unknown') %}
+                {% set meta = wp.get('meta', {}) %}
+                {% set seo_title = meta.get('_yoast_wpseo_title', '') %}
+                {% set meta_desc = meta.get('_yoast_wpseo_metadesc', '') %}
+                {% set focus_kw = meta.get('_yoast_wpseo_focuskw', '') %}
+                {% set st_len = seo_title | length %}
+                {% set md_len = meta_desc | length %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium text-gray-800 max-w-[200px] truncate" title="{{ post.title }}">{{ post.title }}</td>
+                    <td class="px-4 py-3">
+                        {% if post.post_type == 'update' %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Updated</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">New</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-500 text-xs">
+                        {{ authors.get(post.author_wp_id, '-') if post.author_wp_id else '-' }}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if wp_status == 'publish' %}
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Published</span>
+                        {% elif wp_status == 'future' %}
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Scheduled</span>
+                        {% else %}
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ wp_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ post.scheduled_time | format_dt }}</td>
+                    <td class="px-4 py-3">
+                        {% if seo_title %}
+                        <span class="text-xs {% if 30 <= st_len <= 60 %}text-green-600{% else %}text-red-500{% endif %}">{{ st_len }} chars</span>
+                        {% else %}
+                        <span class="text-xs text-red-400">missing</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if meta_desc %}
+                        <span class="text-xs {% if 120 <= md_len <= 156 %}text-green-600{% else %}text-red-500{% endif %}">{{ md_len }} chars</span>
+                        {% else %}
+                        <span class="text-xs text-red-400">missing</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-xs text-gray-500 max-w-[120px] truncate">{{ focus_kw or '-' }}</td>
+                    <td class="px-4 py-3">
+                        {% if post.source_transcript %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700" title="From call transcript">Call</span>
+                        {% else %}
+                        <span class="text-xs text-gray-300">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <a href="/posts/{{ post.wp_post_id }}" class="text-sm font-medium mr-2" style="color:{{ brand_color }}">Edit</a>
+                        <a href="{{ wp.get('link', '#') }}" target="_blank" class="text-blue-500 hover:text-blue-700 text-sm">Preview</a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not posts %}
+                <tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">No posts found.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

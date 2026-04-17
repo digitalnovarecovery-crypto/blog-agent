@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-800 mb-6">Site Settings</h2>
+
+<div class="space-y-6">
+{% for site in sites %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style="border-left: 4px solid {{ site.brand_color }}">
+        <div class="flex items-center gap-3">
+            <span class="w-3 h-3 rounded-full" style="background:{{ site.brand_color }}"></span>
+            <h3 class="font-semibold text-gray-800">{{ site.name }}</h3>
+            <span class="text-xs text-gray-400">{{ site.domain }}</span>
+        </div>
+        <button onclick="document.getElementById('form-{{ site.id }}').classList.toggle('hidden')"
+                class="text-sm font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200">
+            Edit
+        </button>
+    </div>
+
+    <!-- Quick info -->
+    <div class="px-6 py-3 bg-gray-50 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div>
+            <span class="text-gray-400 text-xs">WP URL</span>
+            <p class="text-gray-700 truncate">{{ site.wp_site_url }}</p>
+        </div>
+        <div>
+            <span class="text-gray-400 text-xs">Timezone</span>
+            <p class="text-gray-700">{{ site.timezone }}</p>
+        </div>
+        <div>
+            <span class="text-gray-400 text-xs">Min Words</span>
+            <p class="text-gray-700">{{ site.min_word_count }}</p>
+        </div>
+        <div>
+            <span class="text-gray-400 text-xs">Connection</span>
+            <button onclick="testWp('{{ site.id }}')" id="wp-test-btn-{{ site.id }}"
+                    class="text-blue-600 hover:text-blue-800 text-xs font-medium">Test WP</button>
+            <span id="wp-test-result-{{ site.id }}" class="text-xs ml-1"></span>
+        </div>
+    </div>
+
+    <!-- Edit form (hidden by default) -->
+    <form id="form-{{ site.id }}" action="/settings/{{ site.id }}" method="POST" class="hidden p-6 space-y-4 border-t border-gray-100">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Site Name</label>
+                <input type="text" name="name" value="{{ site.name }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Domain</label>
+                <input type="text" name="domain" value="{{ site.domain }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">WP Site URL</label>
+                <input type="text" name="wp_site_url" value="{{ site.wp_site_url }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">WP Username</label>
+                <input type="text" name="wp_username" value="{{ site.wp_username }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">WP App Password</label>
+                <input type="password" name="wp_app_password" placeholder="Leave blank to keep current" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                <input type="text" name="phone_number" value="{{ site.phone_number }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Brand Color</label>
+                <div class="flex items-center gap-2">
+                    <input type="color" name="brand_color" value="{{ site.brand_color }}" class="h-9 w-14 rounded border border-gray-300 cursor-pointer">
+                    <span class="text-xs text-gray-400 font-mono">{{ site.brand_color }}</span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                <input type="text" name="timezone" value="{{ site.timezone }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Min Word Count</label>
+                <input type="number" name="min_word_count" value="{{ site.min_word_count }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">GA4 Property ID</label>
+                <input type="text" name="ga4_property_id" value="{{ site.ga4_property_id }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">GSC Site URL</label>
+                <input type="text" name="gsc_site_url" value="{{ site.gsc_site_url }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
+            </div>
+        </div>
+        <div class="flex gap-3 pt-2">
+            <button type="submit" class="text-white px-5 py-2 rounded-lg text-sm font-medium hover:brightness-110 transition" style="background:{{ site.brand_color }}">
+                Save Changes
+            </button>
+            <button type="button" onclick="document.getElementById('form-{{ site.id }}').classList.add('hidden')"
+                    class="px-5 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-600 hover:bg-gray-50">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>
+{% endfor %}
+</div>
+
+<script>
+async function testWp(siteId) {
+    const btn = document.getElementById(`wp-test-btn-${siteId}`);
+    const result = document.getElementById(`wp-test-result-${siteId}`);
+    btn.textContent = 'Testing...';
+    result.textContent = '';
+    try {
+        const resp = await fetch(`/settings/${siteId}/test-wp`, {method: 'POST'});
+        const data = await resp.json();
+        if (data.ok) {
+            result.textContent = data.message;
+            result.className = 'text-xs ml-1 text-green-600';
+        } else {
+            result.textContent = data.message;
+            result.className = 'text-xs ml-1 text-red-500';
+        }
+    } catch (e) {
+        result.textContent = 'Connection error';
+        result.className = 'text-xs ml-1 text-red-500';
+    }
+    btn.textContent = 'Test WP';
+}
+</script>
+{% endblock %}

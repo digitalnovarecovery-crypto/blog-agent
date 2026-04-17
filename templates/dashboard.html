@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-800 mb-6">{{ site_name }} Dashboard</h2>
+
+<!-- Metric Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <p class="text-sm text-gray-500">Posts This Week</p>
+        <p class="text-3xl font-bold mt-1" style="color:{{ brand_color }}">{{ posts_week }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <p class="text-sm text-gray-500">Posts This Month</p>
+        <p class="text-3xl font-bold mt-1" style="color:{{ brand_color }}">{{ posts_month }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <p class="text-sm text-gray-500">Pending Questions</p>
+        <p class="text-3xl font-bold text-amber-600 mt-1">{{ pending_questions }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <p class="text-sm text-gray-500">Calls Processed</p>
+        <p class="text-3xl font-bold text-blue-600 mt-1">{{ total_calls }}</p>
+    </div>
+</div>
+
+<!-- Recent Posts -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
+    <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="font-semibold text-gray-800">Recent Posts</h3>
+        <a href="/posts" class="text-sm hover:underline" style="color:{{ brand_color }}">View all &rarr;</a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="px-5 py-3 text-left">Title</th>
+                    <th class="px-5 py-3 text-left">Status</th>
+                    <th class="px-5 py-3 text-left">Scheduled</th>
+                    <th class="px-5 py-3 text-left">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for post in recent_posts %}
+                {% set wp = wp_data.get(post.wp_post_id, {}) %}
+                {% set wp_status = wp.get('status', 'unknown') %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-3 font-medium text-gray-800 max-w-xs truncate">{{ post.title }}</td>
+                    <td class="px-5 py-3">
+                        {% if wp_status == 'publish' %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Published</span>
+                        {% elif wp_status == 'future' %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Scheduled</span>
+                        {% else %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ wp_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-gray-500">{{ post.scheduled_time | format_dt }}</td>
+                    <td class="px-5 py-3">
+                        <a href="/posts/{{ post.wp_post_id }}" class="text-sm font-medium" style="color:{{ brand_color }}">Edit</a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not recent_posts %}
+                <tr><td colspan="4" class="px-5 py-8 text-center text-gray-400">No posts yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Top Posts -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
+    <div class="px-5 py-4 border-b border-gray-100">
+        <h3 class="font-semibold text-gray-800">Top Posts</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="px-5 py-3 text-left">Title</th>
+                    <th class="px-5 py-3 text-left">Type</th>
+                    <th class="px-5 py-3 text-left">Status</th>
+                    <th class="px-5 py-3 text-left">Published</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for post in top_posts %}
+                {% set wp = wp_data.get(post.wp_post_id, {}) %}
+                {% set wp_status = wp.get('status', 'unknown') %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-3 font-medium text-gray-800 max-w-xs truncate">
+                        <a href="/posts/{{ post.wp_post_id }}" class="hover:underline">{{ post.title }}</a>
+                    </td>
+                    <td class="px-5 py-3">
+                        {% if post.post_type == 'update' %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Updated</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">New</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3">
+                        {% if wp_status == 'publish' %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Published</span>
+                        {% elif wp_status == 'future' %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Scheduled</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ wp_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-gray-500 text-xs whitespace-nowrap">{{ post.created_at | format_dt }}</td>
+                </tr>
+                {% endfor %}
+                {% if not top_posts %}
+                <tr><td colspan="4" class="px-5 py-8 text-center text-gray-400">No posts yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent Questions -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="font-semibold text-gray-800">Recent Questions</h3>
+        <a href="/questions" class="text-sm hover:underline" style="color:{{ brand_color }}">View all &rarr;</a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="px-5 py-3 text-left">Question</th>
+                    <th class="px-5 py-3 text-left">Topic</th>
+                    <th class="px-5 py-3 text-left">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for q in recent_questions %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-3 text-gray-800 max-w-md truncate">{{ q.question }}</td>
+                    <td class="px-5 py-3 text-gray-500">{{ q.topic or '-' }}</td>
+                    <td class="px-5 py-3">
+                        {% if q.status == 'pending' %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending</span>
+                        {% elif q.status == 'used' %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Used</span>
+                        {% else %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ q.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not recent_questions %}
+                <tr><td colspan="3" class="px-5 py-8 text-center text-gray-400">No questions extracted yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

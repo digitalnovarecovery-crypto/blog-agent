@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard{% endblock %} - {{ site_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '{{ brand_color }}',
+          }
+        }
+      }
+    }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .sidebar-link {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.625rem 0.75rem; border-radius: 0.5rem;
+            font-size: 0.875rem; font-weight: 500; color: #e2e8f0;
+            transition: background 0.15s;
+        }
+        .sidebar-link:hover { background: rgba(255,255,255,0.1); }
+        .sidebar-link.active { background: rgba(255,255,255,0.15); color: #fff; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full">
+<div class="min-h-full">
+    <!-- Mobile menu button -->
+    <div class="lg:hidden text-white px-4 py-3 flex items-center justify-between" style="background:{{ brand_color }}">
+        <span class="font-bold text-lg">{{ site_name }}</span>
+        <button onclick="document.getElementById('sidebar').classList.toggle('hidden')" class="p-1">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+        </button>
+    </div>
+
+    <div class="flex">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="hidden lg:flex lg:flex-col w-64 min-h-screen flex-shrink-0 text-white" style="background:{{ brand_color }}">
+            <!-- Site selector -->
+            <div class="p-5 border-b border-white/10">
+                <select onchange="window.location.href='/switch-site/'+this.value"
+                        class="w-full rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 bg-white/90 border-0 focus:ring-2 focus:ring-white/40">
+                    {% for s in all_sites %}
+                    <option value="{{ s.id }}" {% if s.id == current_site_id %}selected{% endif %}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs mt-2 opacity-70">{{ current_site.domain if current_site else '' }}</p>
+            </div>
+
+            <!-- Navigation -->
+            <div class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                <a href="/" class="sidebar-link {% if request.path == '/' %}active{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Dashboard
+                </a>
+                <a href="/posts" class="sidebar-link {% if '/posts' in request.path %}active{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Posts
+                </a>
+                <a href="/calls" class="sidebar-link {% if '/calls' in request.path %}active{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    Calls
+                </a>
+                <a href="/questions" class="sidebar-link {% if '/questions' in request.path %}active{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Questions
+                </a>
+                <a href="/links" class="sidebar-link {% if '/links' in request.path %}active{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                    Internal Links
+                </a>
+                <a href="/calendar" class="sidebar-link {% if '/calendar' in request.path %}active{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Calendar
+                </a>
+                <a href="/activity" class="sidebar-link {% if '/activity' in request.path %}active{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                    Activity Log
+                </a>
+
+                <div class="pt-4 mt-4 border-t border-white/10">
+                    <a href="/settings" class="sidebar-link {% if '/settings' in request.path %}active{% endif %}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Settings
+                    </a>
+                </div>
+            </div>
+
+            <!-- Sidebar footer -->
+            <div class="p-4 border-t border-white/10">
+                {% if current_site %}
+                <a href="{{ current_site.wp_site_url }}/wp-admin/" target="_blank"
+                   class="text-sm opacity-70 hover:opacity-100 transition flex items-center gap-2 mb-3">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    Open WP Admin
+                </a>
+                {% endif %}
+                {% if auth_user %}
+                <div class="flex items-center gap-2 mb-2">
+                    {% if auth_user.picture %}
+                    <img src="{{ auth_user.picture }}" class="w-7 h-7 rounded-full" alt="">
+                    {% endif %}
+                    <span class="text-sm opacity-90 truncate">{{ auth_user.name or auth_user.email or 'User' }}</span>
+                </div>
+                <a href="/logout" class="text-xs opacity-60 hover:opacity-100 transition">Sign out</a>
+                {% endif %}
+                <p class="text-xs opacity-40 mt-2">Blog Agent v2.0</p>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="flex-1 p-6 lg:p-8 max-w-7xl">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for cat, msg in messages %}
+            <div class="mb-4 px-4 py-3 rounded-lg text-sm {% if cat == 'error' %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                {{ msg }}
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>
