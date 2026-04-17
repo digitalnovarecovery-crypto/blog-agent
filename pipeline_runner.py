@@ -408,13 +408,30 @@ Write the blog post now. Return ONLY the JSON object with all required fields.""
     try:
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        post = json.loads(text)
+        # First try strict parsing
+        try:
+            post = json.loads(text)
+        except json.JSONDecodeError:
+            # Allow control characters (common in HTML content from Claude)
+            post = json.loads(text, strict=False)
     except json.JSONDecodeError as e:
-        print(f"  ERROR parsing Claude JSON: {e}")
-        print(f"  First 300 chars: {text[:300]}")
-        print(f"  Last 200 chars: {text[-200:]}")
-        print(f"  Length: {len(text)}, stop_reason: {response.stop_reason}")
-        return None
+        # Last resort: try to extract JSON from the response
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', text)
+        if json_match:
+            try:
+                post = json.loads(json_match.group(), strict=False)
+            except json.JSONDecodeError as e2:
+                print(f"  ERROR parsing Claude JSON: {e2}")
+                print(f"  First 300 chars: {text[:300]}")
+                print(f"  Last 200 chars: {text[-200:]}")
+                print(f"  Length: {len(text)}, stop_reason: {response.stop_reason}")
+                return None
+        else:
+            print(f"  ERROR parsing Claude JSON: {e}")
+            print(f"  First 300 chars: {text[:300]}")
+            print(f"  Length: {len(text)}, stop_reason: {response.stop_reason}")
+            return None
 
     # Validate required keys
     required = [
