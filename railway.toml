@@ -4,6 +4,6 @@ nixpacksConfigPath = "nixpacks.toml"
 
 [deploy]
 healthcheckPath = "/api/health"
-healthcheckTimeout = 120
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
