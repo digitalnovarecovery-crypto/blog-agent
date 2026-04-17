@@ -822,7 +822,7 @@ def run_pipeline(site_filter: str | None = None, max_posts: int | None = None,
                 max_tokens=2000,
                 messages=[{"role": "user", "content": f"""Generate {needed} unique blog topic questions for {cfg.name} ({cfg.domain}).
 
-Site niche: {', '.join(json.loads(cfg.default_categories) if cfg.default_categories else ['recovery'])}
+Site niche: {', '.join(json.loads(cfg.default_categories) if isinstance(cfg.default_categories, str) else (cfg.default_categories or ['recovery']))}
 Location: Austin, Texas
 Target audience: People searching for help with addiction, detox, rehab, or sober living
 
