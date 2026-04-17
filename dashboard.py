@@ -715,7 +715,9 @@ def api_cron_run():
     _pipeline_status["running"] = True
     _pipeline_status["last_run"] = datetime.now().isoformat()
 
-    skip_calls = request.args.get("skip_calls") == "1" or (request.json or {}).get("skip_calls", False)
+    skip_calls = request.args.get("skip_calls") == "1"
+    if request.is_json:
+        skip_calls = skip_calls or request.get_json(silent=True, force=True).get("skip_calls", False)
 
     def _run():
         import traceback
