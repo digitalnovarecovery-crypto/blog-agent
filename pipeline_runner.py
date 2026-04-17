@@ -51,7 +51,10 @@ from modules.site_config import (
     get_site_by_phone,
     wp_session_for_site,
 )
-from modules.wp_mysql_bridge import WPMySQLBridge
+try:
+    from modules.wp_mysql_bridge import WPMySQLBridge
+except ImportError:
+    WPMySQLBridge = None  # pymysql not available — REST API only
 
 # ---------------------------------------------------------------------------
 # Config
@@ -77,7 +80,7 @@ YOAST_DESC_MAX = 156
 # MySQL bridge helpers (for sites where HTTP to own domain hangs)
 # ---------------------------------------------------------------------------
 
-_mysql_bridges: dict[str, WPMySQLBridge] = {}
+_mysql_bridges: dict = {}
 
 
 def _use_mysql(cfg: SiteConfig) -> bool:
