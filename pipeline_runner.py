@@ -800,6 +800,62 @@ def run_pipeline(site_filter: str | None = None, max_posts: int | None = None,
         print("No active sites with WordPress credentials configured. Exiting.")
         return
 
+    # 2b. Auto-generate questions for sites with no pending content
+    print(f"\n--- Phase 0: Auto-Seeding Blog Topics ---")
+    for cfg in active_sites:
+        pending = db.get_pending_questions(limit=10, site_id=cfg.id)
+        if len(pending) >= max_posts:
+            print(f"  {cfg.id}: {len(pending)} pending questions — enough for this run")
+            continue
+
+        needed = max_posts - len(pending)
+        print(f"  {cfg.id}: {len(pending)} pending, generating {needed} new topic(s)...")
+
+        try:
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            # Get existing published titles to avoid duplicates
+            existing_titles = db.get_recent_published_titles(site_id=cfg.id, limit=50)
+            existing_list = "\n".join(f"- {t}" for t in existing_titles) if existing_titles else "None yet"
+
+            resp = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=2000,
+                messages=[{"role": "user", "content": f"""Generate {needed} unique blog topic questions for {cfg.name} ({cfg.domain}).
+
+Site niche: {', '.join(json.loads(cfg.default_categories) if cfg.default_categories else ['recovery'])}
+Location: Austin, Texas
+Target audience: People searching for help with addiction, detox, rehab, or sober living
+
+Already published (DO NOT repeat these topics):
+{existing_list}
+
+For each topic, provide a JSON array of objects with:
+- "question": A specific question someone would search on Google (People Also Ask style)
+- "topic": Short topic label (2-4 words)
+- "keywords": Comma-separated SEO keywords (3-5 keywords)
+
+Return ONLY the JSON array, no other text. Make the questions specific, actionable, and different from what's already published."""}],
+            )
+
+            topics_text = resp.content[0].text.strip()
+            if topics_text.startswith("```"):
+                topics_text = topics_text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            topics = json.loads(topics_text, strict=False)
+
+            for t in topics[:needed]:
+                db.save_question(
+                    call_id=f"auto_{cfg.id}_{int(time.time())}_{topics.index(t)}",
+                    question=t["question"],
+                    topic=t.get("topic", ""),
+                    keywords=t.get("keywords", ""),
+                    context="Auto-generated daily topic",
+                    site_id=cfg.id,
+                )
+                print(f"    Seeded: {t['question'][:80]}")
+
+        except Exception as e:
+            print(f"  ERROR auto-generating topics for {cfg.id}: {e}")
+
     # 3. Fetch and process RingCentral calls
     if not skip_calls:
         print(f"\n--- Phase 1: Fetching RingCentral Calls (past {RC_CALL_LOG_DAYS} days) ---")

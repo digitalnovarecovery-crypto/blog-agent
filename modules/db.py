@@ -136,6 +136,23 @@ def mark_question_used(question_id: int):
     conn.close()
 
 
+def get_recent_published_titles(site_id: str = "", limit: int = 50) -> list[str]:
+    """Get recently published post titles to avoid duplicates."""
+    conn = get_connection()
+    if site_id:
+        rows = conn.execute(
+            "SELECT title FROM published_posts WHERE site_id = ? ORDER BY created_at DESC LIMIT ?",
+            (site_id, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT title FROM published_posts ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+
 def save_published_post(question_id: int, wp_post_id: int, title: str, slug: str, scheduled_time: str):
     conn = get_connection()
     conn.execute(
