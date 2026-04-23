@@ -725,6 +725,17 @@ def publish_blog_post(cfg: SiteConfig, post_data: dict, question_id: int,
     _log_activity(site_id, "pipeline_publish",
                   f"wp_post_id={wp_id} title='{post_data['title']}' scheduled={scheduled_time}")
 
+    # Fire-and-forget webhook to CMO dashboard
+    _notify_cmo_dashboard(
+        brand=site_id,
+        title=post_data["title"],
+        url=wp_post.get("link", ""),
+        keyword=post_data.get("focus_keyphrase", ""),
+        published_at=scheduled_time,
+        excerpt=post_data.get("excerpt", ""),
+        word_count=word_count,
+    )
+
     return {
         "wp_post_id": wp_id,
         "title": post_data["title"],
@@ -738,6 +749,42 @@ def publish_blog_post(cfg: SiteConfig, post_data: dict, question_id: int,
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _notify_cmo_dashboard(brand: str, title: str, url: str, keyword: str,
+                          published_at: str = "", excerpt: str = "",
+                          word_count: int = 0):
+    """Fire-and-forget webhook to CMO dashboard after each publish.
+    Never raises — logs errors and returns silently."""
+    cmo_key = os.environ.get("CMO_WEBHOOK_KEY", "")
+    if not cmo_key:
+        return  # Not configured — skip silently
+
+    payload = {
+        "brand": brand,
+        "title": title,
+        "url": url,
+        "keyword": keyword,
+        "published_at": published_at or datetime.now().isoformat(),
+    }
+    if excerpt:
+        payload["excerpt"] = excerpt
+    if word_count:
+        payload["word_count"] = word_count
+
+    try:
+        resp = requests.post(
+            "http://32.193.178.164/api/cmo/blog-published",
+            json=payload,
+            headers={"X-CMO-Key": cmo_key, "Content-Type": "application/json"},
+            timeout=5,
+        )
+        if resp.status_code == 201:
+            print(f"    [CMO webhook] Notified: {brand} — '{title}'")
+        else:
+            print(f"    [CMO webhook] Non-201 response: {resp.status_code}")
+    except Exception as e:
+        print(f"    [CMO webhook] Failed (non-blocking): {e}")
+
 
 def _strip_html(html: str) -> str:
     return unescape(re.sub(r"<[^>]+>", " ", html or "")).strip()
