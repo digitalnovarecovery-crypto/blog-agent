@@ -275,6 +275,78 @@ def _mysql_upload_featured_image(bridge, search_query: str, author_id: int = 27)
 
 
 # ---------------------------------------------------------------------------
+# Google PAA (People Also Ask) scraper for FAQ generation
+# ---------------------------------------------------------------------------
+
+def scrape_google_paa(keyphrase: str, max_questions: int = 5) -> list[str]:
+    """Scrape Google's 'People Also Ask' questions for a given keyphrase.
+
+    Returns a list of PAA question strings. Falls back to empty list on failure.
+    Used to generate FAQ sections that match real user queries — critical for
+    appearing in AI Overviews and featured snippets.
+    """
+    if not keyphrase:
+        return []
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
+    try:
+        url = "https://www.google.com/search"
+        params = {"q": keyphrase, "gl": "us", "hl": "en"}
+        resp = requests.get(url, params=params, headers=headers, timeout=10)
+        resp.raise_for_status()
+        html = resp.text
+
+        # Extract PAA questions from various patterns Google uses
+        paa_questions = []
+
+        # Pattern 1: data-q attribute (common PAA format)
+        for match in re.finditer(r'data-q="([^"]+)"', html):
+            q = unescape(match.group(1)).strip()
+            if q and q not in paa_questions and "?" in q:
+                paa_questions.append(q)
+
+        # Pattern 2: "People also ask" section with question spans
+        for match in re.finditer(
+            r'<span[^>]*>([^<]*\?)</span>', html
+        ):
+            q = unescape(match.group(1)).strip()
+            if (q and q not in paa_questions and len(q) > 15 and len(q) < 200
+                    and not q.startswith("http")):
+                paa_questions.append(q)
+
+        # Pattern 3: aria-label on expandable elements
+        for match in re.finditer(r'aria-label="([^"]*\?)"', html):
+            q = unescape(match.group(1)).strip()
+            if q and q not in paa_questions and len(q) > 15:
+                paa_questions.append(q)
+
+        # Deduplicate and limit
+        seen = set()
+        unique = []
+        for q in paa_questions:
+            q_lower = q.lower().strip()
+            if q_lower not in seen:
+                seen.add(q_lower)
+                unique.append(q)
+
+        result = unique[:max_questions]
+        if result:
+            print(f"    [PAA] Found {len(result)} 'People Also Ask' questions for '{keyphrase}'")
+        else:
+            print(f"    [PAA] No PAA questions found for '{keyphrase}' — will use Claude-generated FAQs")
+        return result
+
+    except Exception as e:
+        print(f"    [PAA] Google scrape failed (non-blocking): {e}")
+        return []
+
+
+# ---------------------------------------------------------------------------
 # Blog generation
 # ---------------------------------------------------------------------------
 
@@ -374,6 +446,29 @@ def generate_blog_post(question: str, topic: str, keywords: str,
     system_prompt = load_blog_prompt()
     site_context = build_site_context(cfg, all_links)
 
+    # Scrape Google PAA for real user questions to use in FAQ section
+    # This is critical for AI traffic — FAQs based on actual PAA questions
+    # get picked up by AI Overviews and featured snippets
+    primary_keyword = keywords.split(",")[0].strip() if keywords else question[:60]
+    paa_questions = scrape_google_paa(primary_keyword)
+
+    paa_section = ""
+    if paa_questions:
+        paa_section = f"""
+
+## People Also Ask (from Google — USE THESE as FAQ questions)
+The following questions come from Google's "People Also Ask" section for this topic.
+You MUST use ALL of these as FAQ items in your FAQ section. Answer each one in 2-4 sentences.
+You may add 1-2 more questions to reach 4-6 total.
+
+{chr(10).join(f'- {q}' for q in paa_questions)}"""
+    else:
+        paa_section = """
+
+## FAQ Instructions
+No PAA questions were found for this topic. Generate 4-6 FAQ questions that someone searching
+this keyword would naturally ask. Make them conversational and keyword-rich."""
+
     user_message = f"""## Client Question
 {question}
 
@@ -388,8 +483,9 @@ def generate_blog_post(question: str, topic: str, keywords: str,
 
 ## Available Internal Links
 {site_context}
+{paa_section}
 
-Write the blog post now. Return ONLY the JSON object with all required fields."""
+Write the blog post now. Return ONLY the JSON object with all required fields including faq_schema and article_schema."""
 
     try:
         response = client.messages.create(
@@ -443,6 +539,19 @@ Write the blog post now. Return ONLY the JSON object with all required fields.""
     if missing:
         print(f"  ERROR: Missing keys in blog response: {missing}")
         return None
+
+    # Ensure faq_schema exists (generate from content if Claude didn't return it)
+    if "faq_schema" not in post or not post["faq_schema"]:
+        print("    WARN: faq_schema missing from Claude response — extracting from content")
+        post["faq_schema"] = _extract_faq_from_html(post["content_html"])
+
+    # Ensure article_schema exists
+    if "article_schema" not in post or not post["article_schema"]:
+        post["article_schema"] = {
+            "headline": post["title"],
+            "description": post.get("meta_description", post.get("excerpt", "")),
+            "keywords": post.get("focus_keyphrase", ""),
+        }
 
     return post
 
@@ -594,6 +703,16 @@ def publish_blog_post(cfg: SiteConfig, post_data: dict, question_id: int,
                 insert_point = len(paragraphs) // 3
                 paragraphs.insert(insert_point, f"</p>{cta_html}")
             content_html = "</p>".join(paragraphs) + cta_html
+
+    # -- Inject structured data (Article + FAQ schema) into content
+    schema_html = _build_schema_json_ld(
+        post_data, cfg, scheduled_time,
+        post_url=f"https://{cfg.domain}/blog/{post_data['slug']}/",
+    )
+    if schema_html:
+        content_html += "\n" + schema_html
+        faq_count = len(post_data.get("faq_schema", []))
+        print(f"    Schema injected: Article + FAQ ({faq_count} Q&As)")
 
     # -- Convert scheduled_time to MySQL format (YYYY-MM-DD HH:MM:SS)
     try:
@@ -749,6 +868,85 @@ def publish_blog_post(cfg: SiteConfig, post_data: dict, question_id: int,
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _extract_faq_from_html(content_html: str) -> list[dict]:
+    """Extract FAQ Q&A pairs from <details>/<summary> HTML if Claude didn't return faq_schema."""
+    faqs = []
+    for match in re.finditer(
+        r'<summary>(.*?)</summary>\s*<p>(.*?)</p>', content_html, re.DOTALL
+    ):
+        q = _strip_html(match.group(1)).strip()
+        a = _strip_html(match.group(2)).strip()
+        if q and a:
+            faqs.append({"question": q, "answer": a})
+    return faqs
+
+
+def _build_schema_json_ld(post_data: dict, cfg, scheduled_time: str, post_url: str) -> str:
+    """Build JSON-LD structured data for Article + FAQ schema.
+
+    Returns a <script type="application/ld+json"> block to append to content_html.
+    This is critical for AI Overview visibility and rich search results.
+    """
+    schemas = []
+
+    # --- Article Schema ---
+    article_info = post_data.get("article_schema", {})
+    article_schema = {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": article_info.get("headline", post_data["title"]),
+        "description": article_info.get("description", post_data.get("meta_description", "")),
+        "keywords": article_info.get("keywords", post_data.get("focus_keyphrase", "")),
+        "datePublished": scheduled_time,
+        "dateModified": scheduled_time,
+        "author": {
+            "@type": "Organization",
+            "name": cfg.name,
+            "url": f"https://{cfg.domain}",
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": cfg.name,
+            "url": f"https://{cfg.domain}",
+        },
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": post_url or f"https://{cfg.domain}/blog/{post_data['slug']}/",
+        },
+    }
+    schemas.append(article_schema)
+
+    # --- FAQ Schema ---
+    faq_items = post_data.get("faq_schema", [])
+    if faq_items:
+        faq_schema = {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": item["question"],
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": item["answer"],
+                    },
+                }
+                for item in faq_items
+                if item.get("question") and item.get("answer")
+            ],
+        }
+        schemas.append(faq_schema)
+
+    # Build the script tags
+    script_blocks = []
+    for schema in schemas:
+        script_blocks.append(
+            f'<script type="application/ld+json">{json.dumps(schema, ensure_ascii=False)}</script>'
+        )
+
+    return "\n".join(script_blocks)
+
 
 def _notify_cmo_dashboard(brand: str, title: str, url: str, keyword: str,
                           published_at: str = "", excerpt: str = "",

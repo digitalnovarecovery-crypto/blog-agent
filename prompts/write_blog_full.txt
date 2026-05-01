@@ -38,6 +38,41 @@ You will be given the site name, domain, phone number, and pillar pages. Tailor 
    - Reference 12-step programs, IOP, therapy, detox, and holistic recovery approaches as appropriate
    - Never provide medical advice — recommend consulting professionals for medical questions
 
+## FAQ Section (MANDATORY — Critical for AI Traffic)
+
+Every blog post MUST end with an FAQ section containing 4-6 questions and answers. This is non-negotiable.
+
+**If PAA (People Also Ask) questions are provided:**
+- Use ALL provided PAA questions as FAQ items
+- Answer each PAA question in 2-4 sentences — concise, direct, authoritative
+- You may add 1-2 additional related questions to reach 4-6 total
+
+**If no PAA questions are provided:**
+- Generate 4-6 FAQ questions that someone searching the focus keyphrase would ask
+- Questions should be natural, conversational, and keyword-rich
+
+**FAQ HTML Format (toggle/accordion style):**
+The FAQ section in content_html MUST use this exact HTML structure with `<details>` and `<summary>` tags for toggle functionality:
+
+```html
+<h2>Frequently Asked Questions</h2>
+<details>
+<summary>Question text here?</summary>
+<p>Answer text here. Keep answers concise but thorough — 2-4 sentences.</p>
+</details>
+<details>
+<summary>Another question here?</summary>
+<p>Answer text here.</p>
+</details>
+```
+
+**FAQ Schema (MANDATORY):**
+In addition to the HTML toggles in content_html, you MUST also return a separate `faq_schema` field containing the FAQ structured data. This is critical for appearing in AI Overviews and Google's rich results.
+
+## Article Schema (MANDATORY)
+
+You MUST also return an `article_schema` field with Article structured data for the blog post. This tells search engines and AI systems exactly what the content is about.
+
 ## Output Format
 
 Return a single JSON object with ALL of these exact keys. Every field is REQUIRED:
@@ -46,14 +81,25 @@ Return a single JSON object with ALL of these exact keys. Every field is REQUIRE
 {
   "title": "Your SEO-Optimized Blog Title Here",
   "slug": "your-seo-optimized-blog-title-here",
-  "content_html": "<p>Full HTML content of the blog post with internal links...</p>",
+  "content_html": "<p>Full HTML content...</p><h2>Frequently Asked Questions</h2><details><summary>Q1?</summary><p>A1</p></details>...",
   "categories": ["Category1", "Category2"],
   "tags": ["tag-one", "tag-two", "tag-three"],
   "focus_keyphrase": "primary target keyword phrase",
   "seo_title": "SEO Title With Keyword (30-60 characters)",
   "meta_description": "Meta description with focus keyphrase included. Must be 120-156 characters for Yoast green light.",
   "excerpt": "A 2-3 sentence summary of the article that entices readers to click through. Should include the focus keyphrase naturally.",
-  "featured_image_query": "2-4 word realistic photo search term"
+  "featured_image_query": "2-4 word realistic photo search term",
+  "faq_schema": [
+    {"question": "Question 1 text?", "answer": "Answer 1 text."},
+    {"question": "Question 2 text?", "answer": "Answer 2 text."},
+    {"question": "Question 3 text?", "answer": "Answer 3 text."},
+    {"question": "Question 4 text?", "answer": "Answer 4 text."}
+  ],
+  "article_schema": {
+    "headline": "The full article title",
+    "description": "A 1-2 sentence description of the article",
+    "keywords": "comma, separated, keywords, from, the, article"
+  }
 }
 ```
 
@@ -66,6 +112,8 @@ Return a single JSON object with ALL of these exact keys. Every field is REQUIRE
 - **featured_image_query**: 2-4 words describing a realistic, calming photo (e.g., "serene morning porch home", "group therapy circle"). NO text, logos, or symbols — real photography only.
 - **categories**: Use categories appropriate for the site. Common: Recovery, Addiction Treatment, Detox, Sober Living, Austin, Mental Health.
 - **tags**: Use lowercase-hyphenated tags. Prefer existing tags when possible. Create new tags only when no existing tag fits.
+- **faq_schema**: Array of {question, answer} objects. 4-6 items. These MUST match the FAQ questions in the content_html toggles.
+- **article_schema**: Object with headline, description, and keywords for the Article schema.
 
 ## Critical Rules
 
@@ -74,4 +122,7 @@ Return a single JSON object with ALL of these exact keys. Every field is REQUIRE
 3. The meta_description MUST be between 120-156 characters.
 4. The focus_keyphrase MUST appear in both the seo_title and meta_description.
 5. Include at least 2 links to the provided pillar pages.
-6. Return ONLY the JSON object. No markdown fences, no explanation.
+6. The content_html MUST end with an FAQ section using <details>/<summary> toggle HTML.
+7. The faq_schema field MUST contain 4-6 FAQ items matching the content_html FAQ section.
+8. The article_schema field MUST be included.
+9. Return ONLY the JSON object. No markdown fences, no explanation.
