@@ -63,7 +63,7 @@ except ImportError:
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 CLAUDE_MODEL = "claude-sonnet-4-6"
 DEFAULT_SITE = "eudaimonia"
-MAX_POSTS_PER_SITE = 2
+MAX_POSTS_PER_SITE = 3
 RC_CALL_LOG_DAYS = 7
 
 BLOG_PROMPT_PATH = PROJECT_ROOT / "prompts" / "write_blog_full.txt"
@@ -869,6 +869,46 @@ def publish_blog_post(cfg: SiteConfig, post_data: dict, question_id: int,
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _fetch_wp_recent_titles(cfg, days: int = 30) -> list[str]:
+    """Fetch recent post titles directly from WordPress REST API.
+
+    This is used instead of the ephemeral SQLite DB to prevent duplicate
+    topics after Railway redeploys (which wipe the DB).
+    """
+    try:
+        s = wp_session_for_site(cfg)
+        date_from = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00")
+        titles = []
+        page = 1
+        while page <= 3:  # Max 3 pages (150 posts)
+            resp = s.get(
+                f"{cfg.wp_site_url}/wp-json/wp/v2/posts",
+                params={
+                    "after": date_from,
+                    "per_page": 50,
+                    "page": page,
+                    "status": "publish,future",
+                    "orderby": "date",
+                    "order": "desc",
+                    "_fields": "title",
+                },
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                break
+            posts = resp.json()
+            if not posts:
+                break
+            titles.extend(p["title"]["rendered"] for p in posts)
+            page += 1
+            time.sleep(0.3)
+        print(f"    Fetched {len(titles)} recent titles from {cfg.domain} for dedup")
+        return titles
+    except Exception as e:
+        print(f"    WARN: Could not fetch WP titles for dedup: {e}")
+        return []
+
+
 def _extract_faq_from_html(content_html: str) -> list[dict]:
     """Extract FAQ Q&A pairs from <details>/<summary> HTML if Claude didn't return faq_schema."""
     faqs = []
@@ -1058,9 +1098,13 @@ def run_pipeline(site_filter: str | None = None, max_posts: int | None = None,
 
         try:
             client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-            # Get existing published titles to avoid duplicates
-            existing_titles = db.get_recent_published_titles(site_id=cfg.id, limit=50)
-            existing_list = "\n".join(f"- {t}" for t in existing_titles) if existing_titles else "None yet"
+            # Get existing published titles from WORDPRESS (not ephemeral SQLite)
+            # This prevents duplicates even after Railway redeploys wipe the DB
+            existing_titles = _fetch_wp_recent_titles(cfg, days=30)
+            if not existing_titles:
+                # Fallback to SQLite if WP fetch fails
+                existing_titles = db.get_recent_published_titles(site_id=cfg.id, limit=50)
+            existing_list = "\n".join(f"- {t}" for t in existing_titles[:50]) if existing_titles else "None yet"
 
             resp = client.messages.create(
                 model=CLAUDE_MODEL,
