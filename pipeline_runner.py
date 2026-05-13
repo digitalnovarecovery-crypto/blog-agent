@@ -1079,6 +1079,12 @@ def run_pipeline(site_filter: str | None = None, max_posts: int | None = None,
             sys.exit(1)
 
     active_sites = [s for s in all_sites if s.active and s.wp_username]
+    # Rotate site order daily so no site is always processed last
+    # (prevents timeout from always cutting the same site)
+    day_of_year = datetime.now().timetuple().tm_yday
+    if active_sites and not site_filter:
+        shift = day_of_year % len(active_sites)
+        active_sites = active_sites[shift:] + active_sites[:shift]
     print(f"\nActive sites with WP creds: {[s.id for s in active_sites]}")
 
     if not active_sites:

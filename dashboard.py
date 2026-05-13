@@ -839,7 +839,7 @@ def _scheduled_pipeline_run():
     try:
         result = subprocess.run(
             [sys.executable, "pipeline_runner.py"],
-            capture_output=True, text=True, timeout=900,
+            capture_output=True, text=True, timeout=2700,  # 45 min — enough for 3 sites × 3 posts
             cwd=str(Path(__file__).resolve().parent),
         )
         _pipeline_status["last_result"] = {
